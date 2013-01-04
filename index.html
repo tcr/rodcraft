@@ -12,42 +12,129 @@ body { background: -webkit-linear-gradient(#eee, #aaa); }
 </head>
 <body></body>
 
-<script src="http://code.jquery.com/jquery.js"></script>
-<script src="http://mrdoob.github.com/three.js/build/three.min.js"></script>
+<script src="jquery.js"></script>
+<script src="three.min.js"></script>
 <script>
 
 // camera resize: view-source:http://mrdoob.github.com/three.js/examples/webgl_interactive_cubes.html
 
 var camera, scene, projector, renderer;
-var rod, sphere, grip1, grip2;
+var rod, rod2;
 
-var mouse = { x: 0, y: 0 }, INTERSECTED;
+var RODS = [], GRIPS = [], POINTED, SELECTED, TOPOINTS, POINTEDCUBE;
 
-function createGrip() {
-  // set up the sphere vars
-  var radius = 20,
-  segments = 16,
-  rings = 16;
+var mouse = { x: 0, y: 0 };
 
-  // create a new mesh with
-  // sphere geometry - we will cover
-  // the sphereMaterial next!
-  return new THREE.Mesh(
-    new THREE.SphereGeometry(
-    radius,
-    segments,
-    rings),
+function createRod () {
 
-    new THREE.MeshLambertMaterial(
-      {
-        color: 0x0000CC,
-      transparent: true,
-      opacity: 0
+  function createCube (group, CUBES, x, y, z) {
+    var mesh = new THREE.Mesh(
+      new THREE.CubeGeometry(
+      10,
+      10,
+      10),
+
+      new THREE.MeshLambertMaterial({
+        color: 0x33FF99,
+        transparent: true,
+        opacity: 0
       }));
+    mesh.position.x = x;
+    mesh.position.y = y;
+    mesh.position.z = z;
+
+    group.add(mesh);
+    CUBES.push(mesh);
+  }
+
+  function createGrip(group, z) {
+    var K = 190, CUBES = [];
+    createCube(group, CUBES, 0, 0, -K + z);
+    createCube(group, CUBES, 0, 0, K + z);
+    createCube(group, CUBES, 0, -K, 0 + z);
+    createCube(group, CUBES, 0, K, 0 + z);
+    createCube(group, CUBES, -K, 0, 0 + z);
+    createCube(group, CUBES, K, 0, 0 + z);
+
+    // set up the sphere vars
+    var radius = 20,
+    segments = 16,
+    rings = 16;
+
+    // create a new mesh with
+    // sphere geometry - we will cover
+    // the sphereMaterial next!
+    var mesh = new THREE.Mesh(
+      new THREE.SphereGeometry(
+      radius,
+      segments,
+      rings),
+
+      new THREE.MeshLambertMaterial({
+        color: 0x3399FF,
+        transparent: true,
+        opacity: 0
+      }));
+
+    mesh.position.z = z;
+
+    mesh.toggleCubes = function (flag) {
+      TOPOINTS = CUBES;
+      CUBES.forEach(function (cube) {
+        cube.material.opacity = flag ? 0.2 : 0;
+      });
+    }
+
+    mesh.rod = rod;
+
+    group.add(mesh);
+    GRIPS.push(mesh);
+  }
+
+  var group = new THREE.Object3D();
+
+  var rod = (function () {
+    var geometry = new THREE.CubeGeometry( 10, 10, 200 );
+    var material = new THREE.MeshLambertMaterial(
+      {
+        color: 0xFF3333
+      });
+    return new THREE.Mesh( geometry, material );
+  })();
+  RODS.push(rod);
+  group.add(rod);
+
+  var grip1 = createGrip(group, -100 + 5)
+    , grip2 = createGrip(group, +100 - 5);
+
+  return group;
 }
 
-function init() {
+function createRodBetween(from, to) {
+  var rod = createRod();
+  var fromp = from.matrixWorld.multiplyVector3(new THREE.Vector3());
+  var top = to.matrixWorld.multiplyVector3(new THREE.Vector3());
+  rod.position.x = (fromp.x + top.x) / 2;
+  rod.position.y = (fromp.y + top.y) / 2;
+  rod.position.z = (fromp.z + top.z) / 2;
+  if (fromp.x != top.x) {
+    console.log('x');
+    rod.rotation.y = Math.PI/2;
+  }
+  if (fromp.y != top.y) {
+    console.log('y');
+    rod.rotation.x = Math.PI/2;
+  }
+  if (fromp.z != top.z) {
+    console.log('z');
+    rod.rotation.z = Math.PI/2;
+  }
+  RODS.push(rod);
+  scene.add(rod);
+}
 
+function init () {
+  // Camera
   camera = new THREE.PerspectiveCamera(
     75,
     window.innerWidth / window.innerHeight,
@@ -55,115 +142,125 @@ function init() {
   );
   camera.position.z = 500;
 
+  // Build scene.
   scene = new THREE.Scene();
 
-  rod = (function () {
-    var geometry = new THREE.CubeGeometry( 10, 10, 200 );
-    var material = new THREE.MeshLambertMaterial(
-      {
-        color: 0xFF3333
-      });//new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe: false } );
-    return new THREE.Mesh( geometry, material );
-  })();
+  // Add rod
+  rod = createRod();
+  rod.rotation.x = Math.PI/2;
+  scene.add(rod);
+  rod2 = createRod();
+  rod2.rotation.x = Math.PI/2;
+  rod2.rotation.y = Math.PI/2;
+  rod2.position.x = 100 - 5;
+  rod2.position.y = -100 + 5;
+  scene.add(rod2);
 
-  grip1 = createGrip();
-  grip2 = createGrip();
-  grip1.position.z = -100;
-  grip2.position.z = 100;
-
-  group = new THREE.Object3D();
-  group.add(rod);
-  group.add(grip1);
-  group.add(grip2);
-
-  group.rotation.x = Math.PI/2;
-  group.rotation.y = 0.1;
-
-  scene.add(group);
-
-  // create a point light
+  // Add point light
   var pointLight = new THREE.PointLight(0xFFFFFF);
-
   // set its position
   pointLight.position.x = 0;
   pointLight.position.y = 0;
   pointLight.position.z = 500;
-
   // add to the scene
   scene.add(pointLight);
 
+  // Projector
   projector = new THREE.Projector();
 
+  // Render
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize( window.innerWidth, window.innerHeight );
 
+  // Insert element.
   document.body.appendChild( renderer.domElement );
 
 }
 
 function animate() {
-
-  // note: three.js includes requestAnimationFrame shim
-  requestAnimationFrame( animate );
+  requestAnimationFrame(animate);
   render();
 }
 
 function render() {
 
   //group.rotation.x += 0.01;
-  group.rotation.z += 0.02;
+  //group.rotation.z += 0.02;
 
-  // find intersections
-
+  // Intersections.
   var vector = new THREE.Vector3( mouse.x, mouse.y, 1 );
   projector.unprojectVector( vector, camera );
-
   var raycaster = new THREE.Raycaster( camera.position, vector.subSelf( camera.position ).normalize() );
 
-  var intersects = raycaster.intersectObjects( [grip1, grip2] );
+  var intersects = raycaster.intersectObjects( GRIPS );
+  if (intersects.length) {
+    if (POINTED != intersects[0].object) {
+      if (POINTED) {
+        POINTED.material.opacity = POINTED == SELECTED ? 0.3 : 0;
+      }
 
-  if ( intersects.length > 0 ) {
-
-    if ( INTERSECTED != intersects[ 0 ].object ) {
-
-      if ( INTERSECTED ) INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
-
-      INTERSECTED = intersects[ 0 ].object;
-      INTERSECTED.currentHex = INTERSECTED.material.emissive.getHex();
-      INTERSECTED.material.emissive.setHex( 0x0066ff );
-      INTERSECTED.material.opacity = 0.5;
-
+      POINTED = intersects[ 0 ].object;
+      POINTED.material.opacity = POINTED == SELECTED ? 0.3 : 0.15;
     }
-
   } else {
-
-    if ( INTERSECTED ) {
-      INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
-      INTERSECTED.material.opacity = 0;
+    if (POINTED) {
+      POINTED.material.opacity = POINTED == SELECTED ? 0.3 : 0;
     }
-
-    INTERSECTED = null;
-
+    POINTED = null;
   }
 
-  renderer.render( scene, camera );
+  if (TOPOINTS) {
+    var intersects = raycaster.intersectObjects( TOPOINTS );
+    if (intersects.length) {
+      if (POINTEDCUBE != intersects[0].object) {
+        if (POINTEDCUBE) {
+          POINTEDCUBE.material.opacity = 0.2;
+        }
 
+        POINTEDCUBE = intersects[ 0 ].object;
+        POINTEDCUBE.material.opacity = 0.5;
+      }
+    } else {
+      if (POINTEDCUBE) {
+        POINTEDCUBE.material.opacity = 0.2;
+      }
+      POINTEDCUBE = null;
+    }
+  }
+
+  renderer.render(scene, camera);
 }
 
 function onDocumentMouseMove( event ) {
-
-  event.preventDefault();
-
   mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
   mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
-
+  return false;
 }
 
 $(document).on('mousemove', onDocumentMouseMove);
 
+$(document).on('mousedown', function () {
+  if (POINTEDCUBE) {
+    createRodBetween(SELECTED, POINTEDCUBE);
+    console.log('connect');
+  }
+  else if (POINTED) {
+    if (SELECTED) {
+      SELECTED.material.opacity = 0;
+    }
+    SELECTED = POINTED;
+    SELECTED.material.opacity = 0.5;
+    SELECTED.toggleCubes(true);
+  }
+});
+
 $(document).on('keydown', function (e) {
+  console.log(e.which);
   switch (e.which) {
-    case 38: camera.position.z -= 2; console.log(camera.position.z);
+    case 38: camera.position.z += -12; break;
+    case 40: camera.position.z += +12; break;
+    case 39: camera.rotation.y -= Math.PI/60; break;
+    case 37: camera.rotation.y += Math.PI/60; break;
   }
 })
 
