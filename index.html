@@ -12,12 +12,16 @@ body { background: -webkit-linear-gradient(#eee, #aaa); }
 </head>
 <body></body>
 
-
+<script src="http://code.jquery.com/jquery.js"></script>
 <script src="http://mrdoob.github.com/three.js/build/three.min.js"></script>
 <script>
 
-var camera, scene, renderer;
-var geometry, material, mesh;
+// camera resize: view-source:http://mrdoob.github.com/three.js/examples/webgl_interactive_cubes.html
+
+var camera, scene, projector, renderer;
+var rod, sphere, group;
+
+var mouse = { x: 0, y: 0 }, INTERSECTED;
 
 init();
 animate();
@@ -33,18 +37,48 @@ function init() {
 
   scene = new THREE.Scene();
 
-  geometry = new THREE.CubeGeometry( 20, 20, 200 );
-  material = new THREE.MeshLambertMaterial(
-    {
-      color: 0xCC0000
-    });//new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe: false } );
+  sphere = (function () {
+    // set up the sphere vars
+    var radius = 20,
+    segments = 16,
+    rings = 16;
 
-  mesh = new THREE.Mesh( geometry, material );
-  scene.add( mesh );
+    // create a new mesh with
+    // sphere geometry - we will cover
+    // the sphereMaterial next!
+    return new THREE.Mesh(
+      new THREE.SphereGeometry(
+      radius,
+      segments,
+      rings),
+
+      new THREE.MeshLambertMaterial(
+        {
+          color: 0x0000CC,
+        transparent: true,
+        opacity: 0
+        }));
+  })();
+
+  sphere.position.z = 100;
+
+  rod = (function () {
+    var geometry = new THREE.CubeGeometry( 10, 10, 200 );
+    var material = new THREE.MeshLambertMaterial(
+      {
+        color: 0xFF3333
+      });//new THREE.MeshBasicMaterial( { color: 0xff0000, wireframe: false } );
+    return new THREE.Mesh( geometry, material );
+  })();
+
+  group = new THREE.Object3D();
+  group.add(rod);
+  group.add(sphere);
+
+  scene.add(group);
 
   // create a point light
-  var pointLight =
-    new THREE.PointLight(0xFFFFFF);
+  var pointLight = new THREE.PointLight(0xFFFFFF);
 
   // set its position
   pointLight.position.x = 0;
@@ -54,7 +88,9 @@ function init() {
   // add to the scene
   scene.add(pointLight);
 
-  renderer = new THREE.CanvasRenderer({ antialias: true });
+  projector = new THREE.Projector();
+
+  renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize( window.innerWidth, window.innerHeight );
 
   document.body.appendChild( renderer.domElement );
@@ -65,14 +101,67 @@ function animate() {
 
   // note: three.js includes requestAnimationFrame shim
   requestAnimationFrame( animate );
+  render();
+}
 
-  mesh.rotation.x += 0.01;
-  mesh.rotation.y += 0.02;
+function render() {
+
+  group.rotation.x += 0.01;
+  group.rotation.y += 0.02;
+
+  // find intersections
+
+  var vector = new THREE.Vector3( mouse.x, mouse.y, 1 );
+  projector.unprojectVector( vector, camera );
+
+  var raycaster = new THREE.Raycaster( camera.position, vector.subSelf( camera.position ).normalize() );
+
+  var intersects = raycaster.intersectObjects( [sphere] );
+
+  if ( intersects.length > 0 ) {
+
+    if ( INTERSECTED != intersects[ 0 ].object ) {
+
+      if ( INTERSECTED ) INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+
+      INTERSECTED = intersects[ 0 ].object;
+      INTERSECTED.currentHex = INTERSECTED.material.emissive.getHex();
+      INTERSECTED.material.emissive.setHex( 0x0066ff );
+      INTERSECTED.material.opacity = 0.5;
+
+    }
+
+  } else {
+
+    if ( INTERSECTED ) {
+      INTERSECTED.material.emissive.setHex( INTERSECTED.currentHex );
+      INTERSECTED.material.opacity = 0;
+    }
+
+    INTERSECTED = null;
+
+  }
 
   renderer.render( scene, camera );
 
 }
 
+function onDocumentMouseMove( event ) {
+
+  event.preventDefault();
+
+  mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
+  mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
+
+}
+
+$(document).on('mousemove', onDocumentMouseMove);
+
+$(document).on('keydown', function (e) {
+  switch (e.which) {
+    case 38: camera.position.z -= 2; console.log(camera.position.z);
+  }
+})
 </script>
 
 </html>
