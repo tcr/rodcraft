@@ -19,12 +19,32 @@ body { background: -webkit-linear-gradient(#eee, #aaa); }
 // camera resize: view-source:http://mrdoob.github.com/three.js/examples/webgl_interactive_cubes.html
 
 var camera, scene, projector, renderer;
-var rod, sphere, group;
+var rod, sphere, grip1, grip2;
 
 var mouse = { x: 0, y: 0 }, INTERSECTED;
 
-init();
-animate();
+function createGrip() {
+  // set up the sphere vars
+  var radius = 20,
+  segments = 16,
+  rings = 16;
+
+  // create a new mesh with
+  // sphere geometry - we will cover
+  // the sphereMaterial next!
+  return new THREE.Mesh(
+    new THREE.SphereGeometry(
+    radius,
+    segments,
+    rings),
+
+    new THREE.MeshLambertMaterial(
+      {
+        color: 0x0000CC,
+      transparent: true,
+      opacity: 0
+      }));
+}
 
 function init() {
 
@@ -37,31 +57,6 @@ function init() {
 
   scene = new THREE.Scene();
 
-  sphere = (function () {
-    // set up the sphere vars
-    var radius = 20,
-    segments = 16,
-    rings = 16;
-
-    // create a new mesh with
-    // sphere geometry - we will cover
-    // the sphereMaterial next!
-    return new THREE.Mesh(
-      new THREE.SphereGeometry(
-      radius,
-      segments,
-      rings),
-
-      new THREE.MeshLambertMaterial(
-        {
-          color: 0x0000CC,
-        transparent: true,
-        opacity: 0
-        }));
-  })();
-
-  sphere.position.z = 100;
-
   rod = (function () {
     var geometry = new THREE.CubeGeometry( 10, 10, 200 );
     var material = new THREE.MeshLambertMaterial(
@@ -71,9 +66,18 @@ function init() {
     return new THREE.Mesh( geometry, material );
   })();
 
+  grip1 = createGrip();
+  grip2 = createGrip();
+  grip1.position.z = -100;
+  grip2.position.z = 100;
+
   group = new THREE.Object3D();
   group.add(rod);
-  group.add(sphere);
+  group.add(grip1);
+  group.add(grip2);
+
+  group.rotation.x = Math.PI/2;
+  group.rotation.y = 0.1;
 
   scene.add(group);
 
@@ -106,8 +110,8 @@ function animate() {
 
 function render() {
 
-  group.rotation.x += 0.01;
-  group.rotation.y += 0.02;
+  //group.rotation.x += 0.01;
+  group.rotation.z += 0.02;
 
   // find intersections
 
@@ -116,7 +120,7 @@ function render() {
 
   var raycaster = new THREE.Raycaster( camera.position, vector.subSelf( camera.position ).normalize() );
 
-  var intersects = raycaster.intersectObjects( [sphere] );
+  var intersects = raycaster.intersectObjects( [grip1, grip2] );
 
   if ( intersects.length > 0 ) {
 
@@ -162,6 +166,9 @@ $(document).on('keydown', function (e) {
     case 38: camera.position.z -= 2; console.log(camera.position.z);
   }
 })
+
+init();
+animate();
 </script>
 
 </html>
