@@ -25,14 +25,14 @@ var RODS = [], GRIPS = [], POINTED, SELECTED, TOPOINTS, POINTEDCUBE;
 
 var mouse = { x: 0, y: 0 };
 
-function createRod () {
+function createRod (grip1, grip2) {
 
   function createCube (group, CUBES, x, y, z) {
     var mesh = new THREE.Mesh(
       new THREE.CubeGeometry(
-      10,
-      10,
-      10),
+      25,
+      25,
+      25),
 
       new THREE.MeshLambertMaterial({
         color: 0x33FF99,
@@ -43,7 +43,6 @@ function createRod () {
     mesh.position.y = y;
     mesh.position.z = z;
 
-    group.add(mesh);
     CUBES.push(mesh);
   }
 
@@ -81,6 +80,7 @@ function createRod () {
     mesh.toggleCubes = function (flag) {
       TOPOINTS = CUBES;
       CUBES.forEach(function (cube) {
+        flag ? group.add(cube) : group.remove(cube);
         cube.material.opacity = flag ? 0.2 : 0;
       });
     }
@@ -104,30 +104,34 @@ function createRod () {
   RODS.push(rod);
   group.add(rod);
 
-  var grip1 = createGrip(group, -100 + 5)
-    , grip2 = createGrip(group, +100 - 5);
+  if (!grip1) {
+    grip1 = createGrip(group, -100 + 5)
+  }
+  if (!grip2) {
+    grip2 = createGrip(group, 100 - 5);
+  }
 
   return group;
 }
 
 function createRodBetween(from, to) {
-  var rod = createRod();
+  var rod = createRod(from);
   var fromp = from.matrixWorld.multiplyVector3(new THREE.Vector3());
   var top = to.matrixWorld.multiplyVector3(new THREE.Vector3());
   rod.position.x = (fromp.x + top.x) / 2;
   rod.position.y = (fromp.y + top.y) / 2;
   rod.position.z = (fromp.z + top.z) / 2;
-  if (fromp.x != top.x) {
+  if ((fromp.x|0) != (top.x|0)) {
     console.log('x');
-    rod.rotation.y = Math.PI/2;
+    rod.rotation.y = Math.PI/2 * (fromp.y/top.y);
   }
-  if (fromp.y != top.y) {
+  if ((fromp.y|0) != (top.y|0)) {
     console.log('y');
-    rod.rotation.y = Math.PI/2;
+    rod.rotation.x = Math.PI/2 * (fromp.x/top.x);
   }
-  if (fromp.z != top.z) {
+  if ((fromp.z|0) != (top.z|0)) {
     console.log('z');
-    rod.rotation.z = Math.PI/2;
+    rod.rotation.z = Math.PI/2 * (fromp.z/top.z);
   }
   RODS.push(rod);
   scene.add(rod);
