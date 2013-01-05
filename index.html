@@ -27,6 +27,8 @@ var mouse = { x: 0, y: 0 };
 
 function createConstruction (grip1, grip2) {
 
+  var ROD_LENGTH = 200, ROD_RADIUS = 5;
+
   var group = new THREE.Object3D();
 
   function createCube (group, CUBES, x, y, z) {
@@ -49,13 +51,20 @@ function createConstruction (grip1, grip2) {
   }
 
   group.createGrip = function (x, y, z) {
-    var K = 190, CUBES = [];
-    createCube(this, CUBES, 0 + x, 0 + y, -K + z);
-    createCube(this, CUBES, 0 + x, 0 + y, K + z);
-    createCube(this, CUBES, 0 + x, -K + y, 0 + z);
-    createCube(this, CUBES, 0 + x, K + y, 0 + z);
-    createCube(this, CUBES, -K + x, 0 + y, 0 + z);
-    createCube(this, CUBES, K + x, 0 + y, 0 + z);
+    var existing = GRIPS.filter(function (g) {
+      return g.position.x == x && g.position.y == y && g.position.z == z;
+    });
+    if (existing.length) {
+      return existing[0];
+    }
+
+    var CUBES = [];
+    createCube(this, CUBES, 0 + x, 0 + y, -ROD_LENGTH + z);
+    createCube(this, CUBES, 0 + x, 0 + y, ROD_LENGTH + z);
+    createCube(this, CUBES, 0 + x, -ROD_LENGTH + y, 0 + z);
+    createCube(this, CUBES, 0 + x, ROD_LENGTH + y, 0 + z);
+    createCube(this, CUBES, -ROD_LENGTH + x, 0 + y, 0 + z);
+    createCube(this, CUBES, ROD_LENGTH + x, 0 + y, 0 + z);
 
     // set up the sphere vars
     var radius = 20,
@@ -96,7 +105,7 @@ function createConstruction (grip1, grip2) {
   }
 
   group.createRod = function (from, to) {
-    var geometry = new THREE.CubeGeometry( 200, 10, 10 );
+    var geometry = new THREE.CubeGeometry(ROD_LENGTH + ROD_RADIUS*2, ROD_RADIUS*2, ROD_RADIUS*2 );
     var material = new THREE.MeshLambertMaterial(
       {
         color: 0xFF3333
@@ -123,8 +132,8 @@ function createConstruction (grip1, grip2) {
     return rod;
   }
 
-  var grip1 = group.createGrip(-100 + 5, 0, 0)
-  var grip2 = group.createGrip(100 - 5, 0, 0);
+  var grip1 = group.createGrip(-ROD_LENGTH/2, 0, 0)
+  var grip2 = group.createGrip(ROD_LENGTH/2, 0, 0);
 
   group.createRod(grip1, grip2);
 
