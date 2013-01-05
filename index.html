@@ -123,7 +123,7 @@ function createRodBetween(from, to) {
   }
   if (fromp.y != top.y) {
     console.log('y');
-    rod.rotation.x = Math.PI/2;
+    rod.rotation.y = Math.PI/2;
   }
   if (fromp.z != top.z) {
     console.log('z');
@@ -154,15 +154,9 @@ function init () {
   scene = new THREE.Scene();
 
   // Add rod
-  rod = createRod();
-  rod.rotation.x = Math.PI/2;
-  scene.add(rod);
-  rod2 = createRod();
-  rod2.rotation.x = Math.PI/2;
-  rod2.rotation.y = Math.PI/2;
-  rod2.position.x = 100 - 5;
-  rod2.position.y = -100 + 5;
-  scene.add(rod2);
+  var originrod = createRod();
+  originrod.rotation.x = Math.PI/2;
+  scene.add(originrod);
 
   // Add point light
   var pointLight = new THREE.PointLight(0xFFFFFF);
@@ -263,6 +257,7 @@ $(document).on('mousemove', function ( event ) {
 $(document).on('mouseup', function () {
   isMouseDown = false;
   if (SELECTED) {
+    SELECTED.toggleCubes(false);
     SELECTED.material.opacity = 0;
     SELECTED = null;
   }
