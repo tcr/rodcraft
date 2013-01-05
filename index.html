@@ -19,13 +19,15 @@ body { background: -webkit-linear-gradient(#eee, #aaa); }
 // camera resize: view-source:http://mrdoob.github.com/three.js/examples/webgl_interactive_cubes.html
 
 var camera, scene, projector, renderer;
-var rod, rod2;
 
 var RODS = [], GRIPS = [], POINTED, SELECTED, TOPOINTS, POINTEDCUBE;
+var construction;
 
 var mouse = { x: 0, y: 0 };
 
-function createRod (grip1, grip2) {
+function createConstruction (grip1, grip2) {
+
+  var group = new THREE.Object3D();
 
   function createCube (group, CUBES, x, y, z) {
     var mesh = new THREE.Mesh(
@@ -46,14 +48,14 @@ function createRod (grip1, grip2) {
     CUBES.push(mesh);
   }
 
-  function createGrip(group, z) {
+  group.createGrip = function (x, y, z) {
     var K = 190, CUBES = [];
-    createCube(group, CUBES, 0, 0, -K + z);
-    createCube(group, CUBES, 0, 0, K + z);
-    createCube(group, CUBES, 0, -K, 0 + z);
-    createCube(group, CUBES, 0, K, 0 + z);
-    createCube(group, CUBES, -K, 0, 0 + z);
-    createCube(group, CUBES, K, 0, 0 + z);
+    createCube(this, CUBES, 0 + x, 0 + y, -K + z);
+    createCube(this, CUBES, 0 + x, 0 + y, K + z);
+    createCube(this, CUBES, 0 + x, -K + y, 0 + z);
+    createCube(this, CUBES, 0 + x, K + y, 0 + z);
+    createCube(this, CUBES, -K + x, 0 + y, 0 + z);
+    createCube(this, CUBES, K + x, 0 + y, 0 + z);
 
     // set up the sphere vars
     var radius = 20,
@@ -75,6 +77,8 @@ function createRod (grip1, grip2) {
         opacity: 0
       }));
 
+    mesh.position.x = x;
+    mesh.position.y = y;
     mesh.position.z = z;
 
     mesh.toggleCubes = function (flag) {
@@ -85,54 +89,52 @@ function createRod (grip1, grip2) {
       });
     }
 
-    mesh.rod = rod;
-
     group.add(mesh);
     GRIPS.push(mesh);
+
+    return mesh;
   }
 
-  var group = new THREE.Object3D();
-
-  var rod = (function () {
-    var geometry = new THREE.CubeGeometry( 10, 10, 200 );
+  group.createRod = function (from, to) {
+    var geometry = new THREE.CubeGeometry( 200, 10, 10 );
     var material = new THREE.MeshLambertMaterial(
       {
         color: 0xFF3333
       });
-    return new THREE.Mesh( geometry, material );
-  })();
-  RODS.push(rod);
-  group.add(rod);
+    var rod = new THREE.Mesh( geometry, material );
+    rod.position.x = (from.position.x + to.position.x) / 2;
+    rod.position.y = (from.position.y + to.position.y) / 2;
+    rod.position.z = (from.position.z + to.position.z) / 2;
+    if ((from.position.x|0) != (to.position.x|0)) {
+      console.log('x');
+      rod.rotation.x = Math.PI/2 * (from.position.x < to.position.x ? -1 : 1);
+    }
+    if ((from.position.y|0) != (to.position.y|0)) {
+      console.log('y');
+      rod.rotation.z = Math.PI/2 * (from.position.z < to.position.z ? -1 : 1);
+    }
+    if ((from.position.z|0) != (to.position.z|0)) {
+      console.log('z');
+      rod.rotation.y = Math.PI/2 * (from.position.y < to.position.y ? -1 : 1);
+    }
+    console.log(rod.position, from.position.y/to.position.y);
+    RODS.push(rod);
+    group.add(rod);
+    return rod;
+  }
 
-  if (!grip1) {
-    grip1 = createGrip(group, -100 + 5)
-  }
-  if (!grip2) {
-    grip2 = createGrip(group, 100 - 5);
-  }
+  var grip1 = group.createGrip(-100 + 5, 0, 0)
+  var grip2 = group.createGrip(100 - 5, 0, 0);
+
+  group.createRod(grip1, grip2);
 
   return group;
 }
 
 function createRodBetween(from, to) {
   var rod = createRod(from);
-  var fromp = from.matrixWorld.multiplyVector3(new THREE.Vector3());
+  //var fromp = from.matrixWorld.multiplyVector3(new THREE.Vector3());
   var top = to.matrixWorld.multiplyVector3(new THREE.Vector3());
-  rod.position.x = (fromp.x + top.x) / 2;
-  rod.position.y = (fromp.y + top.y) / 2;
-  rod.position.z = (fromp.z + top.z) / 2;
-  if ((fromp.x|0) != (top.x|0)) {
-    console.log('x');
-    rod.rotation.y = Math.PI/2 * (fromp.y/top.y);
-  }
-  if ((fromp.y|0) != (top.y|0)) {
-    console.log('y');
-    rod.rotation.x = Math.PI/2 * (fromp.x/top.x);
-  }
-  if ((fromp.z|0) != (top.z|0)) {
-    console.log('z');
-    rod.rotation.z = Math.PI/2 * (fromp.z/top.z);
-  }
   RODS.push(rod);
   scene.add(rod);
   return rod;
@@ -142,7 +144,7 @@ function destroyRod (rod) {
   RODS = RODS.filter(function (a) {
     return a != rod;
   });
-  scene.remove(rod);
+  construction.remove(rod);
 }
 
 function init () {
@@ -158,9 +160,8 @@ function init () {
   scene = new THREE.Scene();
 
   // Add rod
-  var originrod = createRod();
-  originrod.rotation.x = Math.PI/2;
-  scene.add(originrod);
+  construction = createConstruction();
+  scene.add(construction);
 
   // Add point light
   var pointLight = new THREE.PointLight(0xFFFFFF);
@@ -247,8 +248,9 @@ $(document).on('mousemove', function ( event ) {
   mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 
   if (POINTEDCUBE && isMouseDown && !tmprod) {
-    tmprod = createRodBetween(SELECTED, POINTEDCUBE);
-    console.log('connect');
+    POINTEDCUBE = construction.createGrip(POINTEDCUBE.position.x, POINTEDCUBE.position.y, POINTEDCUBE.position.z);
+    tmprod = construction.createRod(SELECTED, POINTEDCUBE);
+    console.log('connect', tmprod);
   } else if (!POINTEDCUBE && tmprod) {
     destroyRod(tmprod);
     tmprod = null;
