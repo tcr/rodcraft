@@ -131,6 +131,14 @@ function createRodBetween(from, to) {
   }
   RODS.push(rod);
   scene.add(rod);
+  return rod;
+}
+
+function destroyRod (rod) {
+  RODS = RODS.filter(function (a) {
+    return a != rod;
+  });
+  scene.remove(rod);
 }
 
 function init () {
@@ -231,20 +239,40 @@ function render() {
   renderer.render(scene, camera);
 }
 
-function onDocumentMouseMove( event ) {
+
+var isMouseDown = false;
+
+
+var tmprod;
+$(document).on('mousemove', function ( event ) {
   mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
   mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
-  return false;
-}
 
-$(document).on('mousemove', onDocumentMouseMove);
+  if (POINTEDCUBE && isMouseDown && !tmprod) {
+    tmprod = createRodBetween(SELECTED, POINTEDCUBE);
+    console.log('connect');
+  } else if (!POINTEDCUBE && tmprod) {
+    destroyRod(tmprod);
+    tmprod = null;
+  }
+  
+  return false;
+});
+
+
+$(document).on('mouseup', function () {
+  isMouseDown = false;
+  if (SELECTED) {
+    SELECTED.material.opacity = 0;
+    SELECTED = null;
+  }
+  tmprod = null;
+});
 
 $(document).on('mousedown', function () {
-  if (POINTEDCUBE) {
-    createRodBetween(SELECTED, POINTEDCUBE);
-    console.log('connect');
-  }
-  else if (POINTED) {
+  isMouseDown = true;
+
+  if (POINTED) {
     if (SELECTED) {
       SELECTED.material.opacity = 0;
     }
@@ -259,8 +287,8 @@ $(document).on('keydown', function (e) {
   switch (e.which) {
     case 38: camera.position.z += -12; break;
     case 40: camera.position.z += +12; break;
-    case 39: camera.rotation.y -= Math.PI/60; break;
-    case 37: camera.rotation.y += Math.PI/60; break;
+    case 39: camera.position.x -= 12; break;
+    case 37: camera.position.x += 12; break;
   }
 })
 
