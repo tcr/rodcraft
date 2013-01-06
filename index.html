@@ -6,7 +6,7 @@
 <style>
 
 html, body, canvas { width: 100%; height: 100%; margin: 0; padding: 0; display: block; }
-body { background: -webkit-linear-gradient(#eee, #aaa); }
+body { background: -webkit-linear-gradient(#aef, #57a); }
 
 </style>
 </head>
@@ -31,7 +31,7 @@ function createConstruction (grip1, grip2) {
 
   var group = new THREE.Object3D();
 
-  function createCube (group, CUBES, x, y, z) {
+  function createCube (group, CUBES, x, y, z, type) {
     var mesh = new THREE.Mesh(
       new THREE.CubeGeometry(
       25,
@@ -39,13 +39,15 @@ function createConstruction (grip1, grip2) {
       25),
 
       new THREE.MeshLambertMaterial({
-        color: 0x33FF99,
+        color: type ? 0x33FF99 : 0xFFFF00,
         transparent: true,
         opacity: 0
       }));
     mesh.position.x = x;
     mesh.position.y = y;
     mesh.position.z = z;
+
+    mesh.type = type;
 
     CUBES.push(mesh);
   }
@@ -59,12 +61,25 @@ function createConstruction (grip1, grip2) {
     }
 
     var CUBES = [];
-    createCube(this, CUBES, 0 + x, 0 + y, -ROD_LENGTH + z);
-    createCube(this, CUBES, 0 + x, 0 + y, ROD_LENGTH + z);
-    createCube(this, CUBES, 0 + x, -ROD_LENGTH + y, 0 + z);
-    createCube(this, CUBES, 0 + x, ROD_LENGTH + y, 0 + z);
-    createCube(this, CUBES, -ROD_LENGTH + x, 0 + y, 0 + z);
-    createCube(this, CUBES, ROD_LENGTH + x, 0 + y, 0 + z);
+    createCube(this, CUBES, 0 + x, 0 + y, -ROD_LENGTH + z, 0);
+    createCube(this, CUBES, 0 + x, 0 + y, ROD_LENGTH + z, 0);
+    createCube(this, CUBES, 0 + x, -ROD_LENGTH + y, 0 + z, 0);
+    createCube(this, CUBES, 0 + x, ROD_LENGTH + y, 0 + z, 0);
+    createCube(this, CUBES, -ROD_LENGTH + x, 0 + y, 0 + z, 0);
+    createCube(this, CUBES, ROD_LENGTH + x, 0 + y, 0 + z, 0);
+
+    createCube(this, CUBES, 0 + x, -ROD_LENGTH + y, -ROD_LENGTH + z, 1);
+    createCube(this, CUBES, 0 + x, -ROD_LENGTH + y, +ROD_LENGTH + z, 1);
+    createCube(this, CUBES, 0 + x, +ROD_LENGTH + y, -ROD_LENGTH + z, 1);
+    createCube(this, CUBES, 0 + x, +ROD_LENGTH + y, +ROD_LENGTH + z, 1);
+    createCube(this, CUBES, -ROD_LENGTH + x, 0 + y, -ROD_LENGTH + z, 1);
+    createCube(this, CUBES, -ROD_LENGTH + x, 0 + y, +ROD_LENGTH + z, 1);
+    createCube(this, CUBES, +ROD_LENGTH + x, 0 + y, -ROD_LENGTH + z, 1);
+    createCube(this, CUBES, +ROD_LENGTH + x, 0 + y, +ROD_LENGTH + z, 1);
+    createCube(this, CUBES, -ROD_LENGTH + x, -ROD_LENGTH + y, 0 + z, 1);
+    createCube(this, CUBES, +ROD_LENGTH + x, -ROD_LENGTH + y, 0 + z, 1);
+    createCube(this, CUBES, -ROD_LENGTH + x, +ROD_LENGTH + y, 0 + z, 1);
+    createCube(this, CUBES, +ROD_LENGTH + x, +ROD_LENGTH + y, 0 + z, 1);
 
     // set up the sphere vars
     var radius = 20,
@@ -104,11 +119,11 @@ function createConstruction (grip1, grip2) {
     return mesh;
   }
 
-  group.createRod = function (from, to) {
+  group.createRod = function (from, to, type) {
     var geometry = new THREE.CubeGeometry(ROD_LENGTH + ROD_RADIUS*2, ROD_RADIUS*2, ROD_RADIUS*2 );
     var material = new THREE.MeshLambertMaterial(
       {
-        color: 0xFF3333
+        color: type ? 0x999999 : 0xFF3333
       });
     var rod = new THREE.Mesh( geometry, material );
     rod.position.x = (from.position.x + to.position.x) / 2;
@@ -159,7 +174,7 @@ function destroyRod (rod) {
 function init () {
   // Camera
   camera = new THREE.PerspectiveCamera(
-    75,
+    50,
     window.innerWidth / window.innerHeight,
     1, 10000
   );
@@ -256,9 +271,10 @@ $(document).on('mousemove', function ( event ) {
   mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
   mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 
-  if (POINTEDCUBE && isMouseDown && !tmprod) {
+  if (POINTEDCUBE && !tmprod) {
+    var type = POINTEDCUBE.type;
     POINTEDCUBE = construction.createGrip(POINTEDCUBE.position.x, POINTEDCUBE.position.y, POINTEDCUBE.position.z);
-    tmprod = construction.createRod(SELECTED, POINTEDCUBE);
+    tmprod = construction.createRod(SELECTED, POINTEDCUBE, type);
     console.log('connect', tmprod);
   } else if (!POINTEDCUBE && tmprod) {
     destroyRod(tmprod);
@@ -271,16 +287,20 @@ $(document).on('mousemove', function ( event ) {
 
 $(document).on('mouseup', function () {
   isMouseDown = false;
-  if (SELECTED) {
-    SELECTED.toggleCubes(false);
+  return;
+  /*
     SELECTED.material.opacity = 0;
     SELECTED = null;
-  }
-  tmprod = null;
+  */
 });
 
 $(document).on('mousedown', function () {
   isMouseDown = true;
+
+  if (tmprod) {
+    SELECTED.toggleCubes(false);
+    tmprod = null;
+  }
 
   if (POINTED) {
     if (SELECTED) {
@@ -295,10 +315,16 @@ $(document).on('mousedown', function () {
 $(document).on('keydown', function (e) {
   console.log(e.which);
   switch (e.which) {
-    case 38: camera.position.z += -12; break;
-    case 40: camera.position.z += +12; break;
-    case 39: camera.position.x -= 12; break;
-    case 37: camera.position.x += 12; break;
+    case 65: camera.rotation.y += Math.PI/36; break; // A
+    case 68: camera.rotation.y -= Math.PI/36; break; // D
+    case 83: camera.rotation.x += Math.PI/36; break; // S
+    case 87: camera.rotation.x -= Math.PI/36; break; // W
+    case 38: camera.position.z -= 12; break; // ^
+    case 40: camera.position.z += 12; break; // v
+    case 39: camera.position.x += 12; break; // <-
+    case 37: camera.position.x -= 12; break; // ->
+    case 70: camera.position.y -= 12; break; // F
+    case 82: camera.position.y += 12; break; // R
   }
 })
 
