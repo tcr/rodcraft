@@ -45,6 +45,9 @@ var camera, scene, projector, renderer;
 var RODS = [], GRIPS = [], POINTED, SELECTED, TOPOINTS, POINTEDCUBE;
 var construction, straightGrid, diagonalGrid;
 
+var GRIP_OPACITY = 0.2, GRIP_OPACITY_HIGHLIGHT = 0.45;
+var CUBE_OPACITY = 0.2, CUBE_OPACITY_HIGHLIGHT = 0.45;
+
 var mouse = { x: 0, y: 0 };
 
 var Controls, MouseEvent;
@@ -183,8 +186,9 @@ function createCube (group, x, y, z, type) {
 
     new THREE.MeshLambertMaterial({
       color: type ? 0x33FF99 : 0xFFFF00,
+      ambient: type ? 0x33FF99 : 0xFFFF00,
       transparent: true,
-      opacity: 0.1
+      opacity: CUBE_OPACITY
     }));
   mesh.position.x = x;
   mesh.position.y = y;
@@ -254,6 +258,7 @@ function createConstruction (grip1, grip2) {
 
       new THREE.MeshLambertMaterial({
         color: 0x3399FF,
+        ambient: 0x3399FF,
         transparent: true,
         opacity: 0
       }));
@@ -273,7 +278,8 @@ function createConstruction (grip1, grip2) {
 
     var geometry = new THREE.CubeGeometry(ROD_LENGTH + ROD_RADIUS*2, ROD_RADIUS*2, ROD_RADIUS*2 );
     var material = new THREE.MeshLambertMaterial({
-      color: type ? 0xFFFF00 : 0x0000FF
+      color: type ? 0xFFFF00 : 0x0000FF,
+      ambient: type ? 0xFFFF00 : 0x0000FF
     });
     var rod = new THREE.Mesh( geometry, material );
     rod.position.x = (from.position.x + to.position.x) / 2;
@@ -342,30 +348,44 @@ function init () {
     1, 10000
   );
   camera.position.z = 8;
+  camera.position.y = 1;
 
   // Build scene.
   scene = new THREE.Scene();
 
+  var plane = new THREE.Mesh(new THREE.PlaneGeometry(10000, 10000),
+    new THREE.MeshLambertMaterial({
+        color: 0x00aa00,
+        ambient: 0x00aa00
+    }));
+  plane.overdraw = true;
+  plane.rotation.x = -Math.PI/2;
+  plane.position.y -= ROD_RADIUS;
+  scene.add(plane);
+
   // Add rod
   construction = createConstruction();
-  construction.position.y -= 1;
+  construction.position.y = 0;
   scene.add(construction);
 
   straightGrid = createStraightGridControl();
   diagonalGrid = createDiagonalGridControl();
 
+  // add subtle ambient lighting
+        var ambientLight = new THREE.AmbientLight(0x888888);
+        scene.add(ambientLight);
+
   // Add point light
-  var pointLight = new THREE.PointLight(0xFFFFFF);
-  // set its position
-  pointLight.position.x = 0;
-  pointLight.position.y = 0;
-  pointLight.position.z = 500;
+  var directionalLight = new THREE.PointLight(0xffffff, 1);
+  directionalLight.position.set( 0, 50, 0);
+  scene.add(directionalLight);
   // add to the scene
-  scene.add(pointLight);
+  //scene.add(pointLight);
 
   // Projector
   projector = new THREE.Projector();
 
+  // Controls
   controls = new Controls(camera);
 
   // Render
@@ -395,7 +415,7 @@ var KEY_F = 70;
 var KEY_SPACE = 32;
 var KEY_SHIFT = 16;
 
-var ACCEL_GRAV = -0.004, accel_y = 0;
+var ACCEL_GRAV = -0.004, accel_y = 0, PLAYER_HEIGHT = 1;
 
 function render() {
 
@@ -416,8 +436,8 @@ function render() {
 
     camera.position.y += accel_y;
     accel_y += ACCEL_GRAV;
-    if (camera.position.y < 0) {
-      camera.position.y = 0;
+    if (camera.position.y < PLAYER_HEIGHT) {
+      camera.position.y = PLAYER_HEIGHT;
       accel_y = 0;
     }
 
@@ -433,15 +453,15 @@ function render() {
       if (intersects.length) {
         if (POINTED != intersects[0].object) {
           if (POINTED) {
-            POINTED.material.opacity = POINTED == SELECTED ? 0.3 : 0;
+            POINTED.material.opacity = POINTED == SELECTED ? GRIP_OPACITY_HIGHLIGHT : 0;
           }
 
           POINTED = intersects[ 0 ].object;
-          POINTED.material.opacity = POINTED == SELECTED ? 0.3 : 0.15;
+          POINTED.material.opacity = POINTED == SELECTED ? GRIP_OPACITY_HIGHLIGHT : GRIP_OPACITY;
         }
       } else {
         if (POINTED) {
-          POINTED.material.opacity = POINTED == SELECTED ? 0.3 : 0;
+          POINTED.material.opacity = POINTED == SELECTED ? GRIP_OPACITY_HIGHLIGHT : 0;
         }
         POINTED = null;
       }
@@ -451,15 +471,15 @@ function render() {
         if (intersects.length) {
           if (POINTEDCUBE != intersects[0].object) {
             if (POINTEDCUBE) {
-              POINTEDCUBE.material.opacity = 0.1;
+              POINTEDCUBE.material.opacity = CUBE_OPACITY;
             }
 
             POINTEDCUBE = intersects[ 0 ].object;
-            POINTEDCUBE.material.opacity = 0.4;
+            POINTEDCUBE.material.opacity = CUBE_OPACITY_HIGHLIGHT;
           }
         } else {
           if (POINTEDCUBE) {
-            POINTEDCUBE.material.opacity = 0.1;
+            POINTEDCUBE.material.opacity = CUBE_OPACITY;
           }
           POINTEDCUBE = null;
         }
