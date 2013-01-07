@@ -334,6 +334,7 @@ function init () {
 
   // Add rod
   construction = createConstruction();
+  construction.position.y -= 1;
   scene.add(construction);
 
   // Add point light
@@ -374,6 +375,9 @@ var KEY_A = 65;
 var KEY_D = 68;
 var KEY_R = 82;
 var KEY_F = 70;
+var KEY_SPACE = 32;
+
+var ACCEL_GRAV = -0.004, accel_y = 0.170;
 
 function render() {
 
@@ -387,7 +391,16 @@ function render() {
   if (keysdown[KEY_A])      camera.position.x -= 0.02;
   if (keysdown[KEY_D])      camera.position.x += 0.02;
 
+  if (keysdown[KEY_SPACE] && accel_y == 0)  accel_y = 0.170;
+
   controls.update();
+
+  camera.position.y += accel_y;
+  accel_y += ACCEL_GRAV;
+  if (camera.position.y < 0) {
+    camera.position.y = 0;
+    accel_y = 0;
+  }
 
   // Intersections.
   if (controls.target) {
