@@ -7,16 +7,26 @@
 
 html, body, canvas { width: 100%; height: 100%; margin: 0; padding: 0; display: block; }
 body { background: -webkit-linear-gradient(#aef, #57a); }
+#cursor { border: 3px solid white; width: 50px; height: 50px; position: absolute; left: 50%; top: 50%; margin: -25px 0 0 -25px;}
 
 </style>
 </head>
-<body></body>
+<body><div id="cursor"></div></body>
 
 <script src="jquery.js"></script>
 <script src="three.min.js"></script>
 <script>
 
 // camera resize: view-source:http://mrdoob.github.com/three.js/examples/webgl_interactive_cubes.html
+
+function assoc (o, i) {
+    var k, v;
+    for (k in i) {
+      v = i[k];
+      o[k] = v;
+    }
+    return o;
+  }
 
 var camera, scene, projector, renderer;
 
@@ -25,18 +35,151 @@ var construction;
 
 var mouse = { x: 0, y: 0 };
 
+var Controls, MouseEvent;
+
+MouseEvent = {
+  isLeftButton: function(event) {
+    return event.which === 1;
+  },
+  isRightButton: function(event) {
+    return event.which === 3;
+  },
+  isLeftButtonDown: function(event) {
+    return event.button === 0 && this.isLeftButton(event);
+  }
+};
+
+Controls = (function() {
+
+  function Controls(object, domElement) {
+    this.object = object;
+    this.target = new THREE.Vector3(0, 0, 0);
+    this.domElement = domElement || document;
+    this.lookSpeed = 0.20;
+    this.mouseX = 0;
+    this.mouseY = 0;
+    this.lat = 0;
+    this.lon = 0;
+    this.mouseDragOn = false;
+    this.anchorx = null;
+    this.anchory = null;
+    this.defineBindings();
+  }
+
+  Controls.prototype.defineBindings = function() {
+    var _this = this;
+    $(this.domElement).mousemove(function(e) {
+      return _this.onMouseMove(e);
+    });
+    $(this.domElement).mousedown(function(e) {
+      return _this.onMouseDown(e);
+    });
+    $(this.domElement).mouseup(function(e) {
+      return _this.onMouseUp(e);
+    });
+    return $(this.domElement).mouseenter(function(e) {
+      return _this.onMouserEnter(e);
+    });
+  };
+
+  Controls.prototype.onMouserEnter = function(event) {
+    if (!MouseEvent.isLeftButtonDown(event)) {
+      return this.onMouseUp(event);
+    }
+  };
+
+  Controls.prototype.onMouseDown = function(event) {
+    if (!MouseEvent.isLeftButton(event)) {
+      return;
+    }
+    if (this.domElement !== document) {
+      this.domElement.focus();
+    }
+    this.anchorx = event.pageX;
+    this.anchory = event.pageY;
+    this.setMouse(event);
+    this.mouseDragOn = true;
+    return false;
+  };
+
+  Controls.prototype.onMouseUp = function(event) {
+    this.mouseDragOn = false;
+    return false;
+  };
+
+  Controls.prototype.setMouse = function(event) {
+  };
+
+  Controls.prototype.onMouseMove = function(event) {
+    event = event.originalEvent;
+    if (event.webkitMovementX || event.webkitMovementY) {
+      this.movementX = event.webkitMovementX;
+      this.movementY = event.webkitMovementY;
+    }
+  };
+
+  Controls.prototype.halfCircle = Math.PI / 180;
+
+  Controls.prototype.viewDirection = function() {
+    return this.target.clone().subSelf(this.object.position);
+  };
+
+  Controls.prototype.move = function(newPosition) {
+    this.object.position = newPosition;
+    return this.updateLook();
+  };
+
+  Controls.prototype.updateLook = function() {
+    var cos, p, phi, sin, theta;
+    sin = Math.sin, cos = Math.cos;
+    phi = (90 - this.lat) * this.halfCircle;
+    theta = this.lon * this.halfCircle;
+    p = this.object.position;
+    assoc(this.target, {
+      x: p.x + 100 * sin(phi) * cos(theta),
+      y: p.y + 100 * cos(phi),
+      z: p.z + 100 * sin(phi) * sin(theta)
+    });
+    console.log(this.target);
+    this.object.lookAt(this.target);
+  };
+
+  Controls.prototype.update = function() {
+    var max, min;
+    if (!this.movementX && !this.movementY) {
+      return;
+    }
+    max = Math.max, min = Math.min;
+    this.lon += (this.movementX) * this.lookSpeed;
+    this.lat -= (this.movementY) * this.lookSpeed;
+    this.movementX = 0;
+    this.movementY = 0;
+    this.lat = max(-85, min(85, this.lat));
+    this.updateLook();
+  };
+
+  return Controls;
+
+})();
+
+window.MouseEvent = MouseEvent;
+
+window.Controls = Controls;
+
+
 function createConstruction (grip1, grip2) {
 
-  var ROD_LENGTH = 200, ROD_RADIUS = 5;
+  var ROD_LENGTH = 2.00, ROD_RADIUS = 0.05;
+  var GRIP_RADIUS = 0.30;
 
   var group = new THREE.Object3D();
 
   function createCube (group, CUBES, x, y, z, type) {
     var mesh = new THREE.Mesh(
       new THREE.CubeGeometry(
-      25,
-      25,
-      25),
+      GRIP_RADIUS*2,
+      GRIP_RADIUS*2,
+      GRIP_RADIUS*2),
 
       new THREE.MeshLambertMaterial({
         color: type ? 0x33FF99 : 0xFFFF00,
@@ -82,7 +225,7 @@ function createConstruction (grip1, grip2) {
     createCube(this, CUBES, +ROD_LENGTH + x, +ROD_LENGTH + y, 0 + z, 1);
 
     // set up the sphere vars
-    var radius = 20,
+    var radius = GRIP_RADIUS,
     segments = 16,
     rings = 16;
 
@@ -121,10 +264,9 @@ function createConstruction (grip1, grip2) {
 
   group.createRod = function (from, to, type) {
     var geometry = new THREE.CubeGeometry(ROD_LENGTH + ROD_RADIUS*2, ROD_RADIUS*2, ROD_RADIUS*2 );
-    var material = new THREE.MeshLambertMaterial(
-      {
-        color: type ? 0x999999 : 0xFF3333
-      });
+    var material = new THREE.MeshLambertMaterial({
+      color: type ? 0x999999 : 0xFF3333
+    });
     var rod = new THREE.Mesh( geometry, material );
     rod.position.x = (from.position.x + to.position.x) / 2;
     rod.position.y = (from.position.y + to.position.y) / 2;
@@ -171,6 +313,13 @@ function destroyRod (rod) {
   construction.remove(rod);
 }
 
+function destroyGrip (grip) {
+  GRIPS = GRIPS.filter(function (a) {
+    return a != grip;
+  });
+  construction.remove(grip);
+}
+
 function init () {
   // Camera
   camera = new THREE.PerspectiveCamera(
@@ -178,7 +327,7 @@ function init () {
     window.innerWidth / window.innerHeight,
     1, 10000
   );
-  camera.position.z = 500;
+  camera.position.z = 5;
 
   // Build scene.
   scene = new THREE.Scene();
@@ -199,6 +348,8 @@ function init () {
   // Projector
   projector = new THREE.Projector();
 
+  controls = new Controls(camera);
+
   // Render
   renderer = new THREE.WebGLRenderer({ antialias: true });
   renderer.setSize( window.innerWidth, window.innerHeight );
@@ -213,49 +364,72 @@ function animate() {
   render();
 }
 
+var KEY_DOWN = 40;
+var KEY_UP = 38;
+var KEY_LEFT = 37;
+var KEY_RIGHT = 39;
+var KEY_W = 87;
+var KEY_S = 83;
+var KEY_A = 65;
+var KEY_D = 68;
+var KEY_R = 82;
+var KEY_F = 70;
+
 function render() {
 
-  //group.rotation.x += 0.01;
-  //group.rotation.z += 0.02;
+  if (keysdown[KEY_DOWN])   construction.rotation.x += 0.02;
+  if (keysdown[KEY_UP])     construction.rotation.x -= 0.02;
+  if (keysdown[KEY_LEFT])   construction.rotation.y -= 0.02;
+  if (keysdown[KEY_RIGHT])  construction.rotation.y += 0.02;
+
+  if (keysdown[KEY_W])      camera.position.z -= 0.05;
+  if (keysdown[KEY_S])      camera.position.z += 0.05;
+  if (keysdown[KEY_A])      camera.position.x -= 0.02;
+  if (keysdown[KEY_D])      camera.position.x += 0.02;
+
+  controls.update();
 
   // Intersections.
-  var vector = new THREE.Vector3( mouse.x, mouse.y, 1 );
-  projector.unprojectVector( vector, camera );
-  var raycaster = new THREE.Raycaster( camera.position, vector.subSelf( camera.position ).normalize() );
+  if (controls.target) {
+    var vector = controls.target.clone(); //new THREE.Vector3( mouse.x, mouse.y, 1 );
+    //projector.unprojectVector( vector, camera );
+    //var raycaster = new THREE.Raycaster( camera.position, vector.subSelf( camera.position ).normalize() );
+    var raycaster = new THREE.Raycaster( camera.position, vector.subSelf(camera.position).normalize() );
 
-  var intersects = raycaster.intersectObjects( GRIPS );
-  if (intersects.length) {
-    if (POINTED != intersects[0].object) {
+    var intersects = raycaster.intersectObjects( GRIPS );
+    if (intersects.length) {
+      if (POINTED != intersects[0].object) {
+        if (POINTED) {
+          POINTED.material.opacity = POINTED == SELECTED ? 0.3 : 0;
+        }
+
+        POINTED = intersects[ 0 ].object;
+        POINTED.material.opacity = POINTED == SELECTED ? 0.3 : 0.15;
+      }
+    } else {
       if (POINTED) {
         POINTED.material.opacity = POINTED == SELECTED ? 0.3 : 0;
       }
-
-      POINTED = intersects[ 0 ].object;
-      POINTED.material.opacity = POINTED == SELECTED ? 0.3 : 0.15;
+      POINTED = null;
     }
-  } else {
-    if (POINTED) {
-      POINTED.material.opacity = POINTED == SELECTED ? 0.3 : 0;
-    }
-    POINTED = null;
-  }
 
-  if (TOPOINTS) {
-    var intersects = raycaster.intersectObjects( TOPOINTS );
-    if (intersects.length) {
-      if (POINTEDCUBE != intersects[0].object) {
+    if (TOPOINTS) {
+      var intersects = raycaster.intersectObjects( TOPOINTS );
+      if (intersects.length) {
+        if (POINTEDCUBE != intersects[0].object) {
+          if (POINTEDCUBE) {
+            POINTEDCUBE.material.opacity = 0.2;
+          }
+
+          POINTEDCUBE = intersects[ 0 ].object;
+          POINTEDCUBE.material.opacity = 0.5;
+        }
+      } else {
         if (POINTEDCUBE) {
           POINTEDCUBE.material.opacity = 0.2;
         }
-
-        POINTEDCUBE = intersects[ 0 ].object;
-        POINTEDCUBE.material.opacity = 0.5;
+        POINTEDCUBE = null;
       }
-    } else {
-      if (POINTEDCUBE) {
-        POINTEDCUBE.material.opacity = 0.2;
-      }
-      POINTEDCUBE = null;
     }
   }
 
@@ -266,20 +440,22 @@ function render() {
 var isMouseDown = false;
 
 
-var tmprod;
+var tmprod, tmpgrip, tmppointed;
 $(document).on('mousemove', function ( event ) {
   mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
   mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
 
-  if (POINTEDCUBE && !tmprod) {
-    var type = POINTEDCUBE.type;
-    POINTEDCUBE = construction.createGrip(POINTEDCUBE.position.x, POINTEDCUBE.position.y, POINTEDCUBE.position.z);
-    tmprod = construction.createRod(SELECTED, POINTEDCUBE, type);
-    console.log('connect', tmprod);
-  } else if (!POINTEDCUBE && tmprod) {
+  if (tmppointed != POINTEDCUBE && tmppointed) {
     destroyRod(tmprod);
-    tmprod = null;
+    destroyGrip(tmpgrip);
+    tmprod = tmpgrip = tmppointed = null;
   }
+  if (POINTEDCUBE && !tmppointed) {
+    tmppointed = POINTEDCUBE;
+    tmpgrip = construction.createGrip(POINTEDCUBE.position.x, POINTEDCUBE.position.y, POINTEDCUBE.position.z);
+    tmprod = construction.createRod(SELECTED, tmpgrip, tmppointed.type);
+    console.log('connect', tmprod);
+  } 
   
   return false;
 });
@@ -287,20 +463,16 @@ $(document).on('mousemove', function ( event ) {
 
 $(document).on('mouseup', function () {
   isMouseDown = false;
-  return;
-  /*
+  if (SELECTED) {
+    SELECTED.toggleCubes(false);
     SELECTED.material.opacity = 0;
     SELECTED = null;
-  */
+  }
+  tmprod = tmpgrip = null;
 });
 
 $(document).on('mousedown', function () {
   isMouseDown = true;
-
-  if (tmprod) {
-    SELECTED.toggleCubes(false);
-    tmprod = null;
-  }
 
   if (POINTED) {
     if (SELECTED) {
@@ -312,21 +484,21 @@ $(document).on('mousedown', function () {
   }
 });
 
+var keysdown = {};
 $(document).on('keydown', function (e) {
-  console.log(e.which);
-  switch (e.which) {
-    case 65: camera.rotation.y += Math.PI/36; break; // A
-    case 68: camera.rotation.y -= Math.PI/36; break; // D
-    case 83: camera.rotation.x += Math.PI/36; break; // S
-    case 87: camera.rotation.x -= Math.PI/36; break; // W
-    case 38: camera.position.z -= 12; break; // ^
-    case 40: camera.position.z += 12; break; // v
-    case 39: camera.position.x += 12; break; // <-
-    case 37: camera.position.x -= 12; break; // ->
-    case 70: camera.position.y -= 12; break; // F
-    case 82: camera.position.y += 12; break; // R
-  }
-})
+  keysdown[e.which] = true;
+});
+$(document).on('keyup', function (e) {
+  delete keysdown[e.which];
+});
+$(document).on('focus', function (e) {
+  keysdown = {};
+});
+
+$(document).on('click', function () {
+  document.body.webkitRequestPointerLock();
+});
+
 
 init();
 animate();
