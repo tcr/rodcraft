@@ -281,11 +281,6 @@ function createConstruction (grip1, grip2) {
     group.remove(grip);
   }
 
-  var grip1 = group.createGrip(-ROD_LENGTH/2, 0, 0)
-  var grip2 = group.createGrip(ROD_LENGTH/2, 0, 0);
-
-  group.createRod(grip1, grip2);
-
   return group;
 }
 
@@ -316,6 +311,21 @@ function init () {
   construction = createConstruction();
   construction.position.y = 0;
   game.scene.add(construction);
+
+  // Create the massive floor
+  var grips = [];
+  var RRR = 10;
+  for (var i = 0; i < RRR; i++) {
+    var griprow = [];
+    for (var j = 0; j < RRR; j++) {
+      var g = construction.createGrip(i*2 - RRR, 0, j*2 - RRR);
+      griprow.push(g);
+      if (griprow[j - 1]) construction.createRod(g, griprow[j-1], 0);
+      if (grips[i - 1] && grips[i - 1][j]) construction.createRod(g, grips[i - 1][j], 0);
+      if (grips[i - 1] && grips[i - 1][j - 1] && griprow[j - 1]) construction.createRod(griprow[j - 1], grips[i - 1][j - 1], 0);
+    }
+    grips.push(griprow);
+  }
 
   straightGrid = createStraightGridControl();
   diagonalGrid = createDiagonalGridControl();
@@ -371,10 +381,10 @@ function render() {
     if (keysdown[KEY_LEFT])   construction.rotation.y -= 0.02;
     if (keysdown[KEY_RIGHT])  construction.rotation.y += 0.02;
 
-    if (keysdown[KEY_W])      camera.position.z -= 0.05;
-    if (keysdown[KEY_S])      camera.position.z += 0.05;
-    if (keysdown[KEY_A])      camera.position.x -= 0.02;
-    if (keysdown[KEY_D])      camera.position.x += 0.02;
+    if (keysdown[KEY_W])      game.camera.position.z -= 0.05;
+    if (keysdown[KEY_S])      game.camera.position.z += 0.05;
+    if (keysdown[KEY_A])      game.camera.position.x -= 0.02;
+    if (keysdown[KEY_D])      game.camera.position.x += 0.02;
 
     if (keysdown[KEY_SPACE] && accel_y == 0)  accel_y = 0.170;
 
