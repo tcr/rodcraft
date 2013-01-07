@@ -7,11 +7,23 @@
 
 html, body, canvas { width: 100%; height: 100%; margin: 0; padding: 0; display: block; }
 body { background: -webkit-linear-gradient(#aef, #57a); }
-#cursor { border: 3px solid white; width: 50px; height: 50px; position: absolute; left: 50%; top: 50%; margin: -25px 0 0 -25px;}
+#cursor { border: 3px solid white; width: 20px; height: 20px; position: absolute; left: 50%; top: 50%; margin: -10px 0 0 -10px;}
+
+p { position: absolute; left: 15px; bottom: 10px; font-size: 12px; font-family: Helvetica; color: white; background: rgba(0, 0, 0, 0.5); border-radius: 10px; padding: 10px 15px; max-width: 250px;  line-height: 1.3; }
+tt { border: 1px solid #aaa; border-radius: 4px; padding: 1px 3px; font-size: 11px; background: rgba(255, 255, 255, 0.05); }
+a { color: white; }
 
 </style>
 </head>
-<body><div id="cursor"></div></body>
+<body><div id="cursor"></div>
+<p>
+  <b>Instructions:</b> Click screen to capture mouse. Click and hold rod end to see where to connect next rod to. Hold down <tt>Shift</tt> to create diagonal rods.<br><br>
+  <tt>W</tt> <tt>A</tt> <tt>S</tt> <tt>D</tt> &mdash; Move Character<br>
+  <tt>Space</tt> &mdash; Jump<br>
+  <tt>&uarr;</tt> <tt>&darr;</tt> <tt>&larr;</tt> <tt>&rarr;</tt> &mdash; Rotate Model (debug)<br><br>
+  <a href="http://github.com/tcr/rodcraft">Rodcraft</a> is a game by <a href="http://github.com/tcr">Tim Cameron Ryan</a>
+</p>
+</body>
 
 <script src="jquery.js"></script>
 <script src="three.min.js"></script>
@@ -31,7 +43,7 @@ function assoc (o, i) {
 var camera, scene, projector, renderer;
 
 var RODS = [], GRIPS = [], POINTED, SELECTED, TOPOINTS, POINTEDCUBE;
-var construction;
+var construction, straightGrid, diagonalGrid;
 
 var mouse = { x: 0, y: 0 };
 
@@ -137,7 +149,6 @@ Controls = (function() {
       y: p.y + 100 * cos(phi),
       z: p.z + 100 * sin(phi) * sin(theta)
     });
-    console.log(this.lon);
     this.object.lookAt(this.target);
   };
 
@@ -162,35 +173,62 @@ Controls = (function() {
 window.MouseEvent = MouseEvent;
 
 window.Controls = Controls;
+  
+function createCube (group, x, y, z, type) {
+  var mesh = new THREE.Mesh(
+    new THREE.CubeGeometry(
+    GRIP_RADIUS*2,
+    GRIP_RADIUS*2,
+    GRIP_RADIUS*2),
 
+    new THREE.MeshLambertMaterial({
+      color: type ? 0x33FF99 : 0xFFFF00,
+      transparent: true,
+      opacity: 0.1
+    }));
+  mesh.position.x = x;
+  mesh.position.y = y;
+  mesh.position.z = z;
+
+  mesh.type = type;
+
+  group.add(mesh);
+}
+
+var ROD_LENGTH = 2.00, ROD_RADIUS = 0.05;
+var GRIP_RADIUS = 0.30;
+
+function createStraightGridControl () {
+  var group = new THREE.Object3D();
+  createCube(group, 0, 0, -ROD_LENGTH, 0);
+  createCube(group, 0, 0, ROD_LENGTH, 0);
+  createCube(group, 0, -ROD_LENGTH, 0, 0);
+  createCube(group, 0, ROD_LENGTH, 0, 0);
+  createCube(group, -ROD_LENGTH, 0, 0, 0);
+  createCube(group, ROD_LENGTH, 0, 0, 0);
+  return group;
+}
+
+function createDiagonalGridControl () {
+  var group = new THREE.Object3D();
+  createCube(group, 0, -ROD_LENGTH, -ROD_LENGTH, 1);
+  createCube(group, 0, -ROD_LENGTH, +ROD_LENGTH, 1);
+  createCube(group, 0, +ROD_LENGTH, -ROD_LENGTH, 1);
+  createCube(group, 0, +ROD_LENGTH, +ROD_LENGTH, 1);
+  createCube(group, -ROD_LENGTH, 0, -ROD_LENGTH, 1);
+  createCube(group, -ROD_LENGTH, 0, +ROD_LENGTH, 1);
+  createCube(group, +ROD_LENGTH, 0, -ROD_LENGTH, 1);
+  createCube(group, +ROD_LENGTH, 0, +ROD_LENGTH, 1);
+  createCube(group, -ROD_LENGTH, -ROD_LENGTH, 0, 1);
+  createCube(group, +ROD_LENGTH, -ROD_LENGTH, 0, 1);
+  createCube(group, -ROD_LENGTH, +ROD_LENGTH, 0, 1);
+  createCube(group, +ROD_LENGTH, +ROD_LENGTH, 0, 1);
+  return group;
+}
 
 function createConstruction (grip1, grip2) {
 
-  var ROD_LENGTH = 2.00, ROD_RADIUS = 0.05;
-  var GRIP_RADIUS = 0.30;
-
   var group = new THREE.Object3D();
-
-  function createCube (group, CUBES, x, y, z, type) {
-    var mesh = new THREE.Mesh(
-      new THREE.CubeGeometry(
-      GRIP_RADIUS*2,
-      GRIP_RADIUS*2,
-      GRIP_RADIUS*2),
-
-      new THREE.MeshLambertMaterial({
-        color: type ? 0x33FF99 : 0xFFFF00,
-        transparent: true,
-        opacity: 0
-      }));
-    mesh.position.x = x;
-    mesh.position.y = y;
-    mesh.position.z = z;
-
-    mesh.type = type;
-
-    CUBES.push(mesh);
-  }
 
   group.createGrip = function (x, y, z) {
     var existing = GRIPS.filter(function (g) {
@@ -199,27 +237,6 @@ function createConstruction (grip1, grip2) {
     if (existing.length) {
       return existing[0];
     }
-
-    var CUBES = [];
-    createCube(this, CUBES, 0 + x, 0 + y, -ROD_LENGTH + z, 0);
-    createCube(this, CUBES, 0 + x, 0 + y, ROD_LENGTH + z, 0);
-    createCube(this, CUBES, 0 + x, -ROD_LENGTH + y, 0 + z, 0);
-    createCube(this, CUBES, 0 + x, ROD_LENGTH + y, 0 + z, 0);
-    createCube(this, CUBES, -ROD_LENGTH + x, 0 + y, 0 + z, 0);
-    createCube(this, CUBES, ROD_LENGTH + x, 0 + y, 0 + z, 0);
-
-    createCube(this, CUBES, 0 + x, -ROD_LENGTH + y, -ROD_LENGTH + z, 1);
-    createCube(this, CUBES, 0 + x, -ROD_LENGTH + y, +ROD_LENGTH + z, 1);
-    createCube(this, CUBES, 0 + x, +ROD_LENGTH + y, -ROD_LENGTH + z, 1);
-    createCube(this, CUBES, 0 + x, +ROD_LENGTH + y, +ROD_LENGTH + z, 1);
-    createCube(this, CUBES, -ROD_LENGTH + x, 0 + y, -ROD_LENGTH + z, 1);
-    createCube(this, CUBES, -ROD_LENGTH + x, 0 + y, +ROD_LENGTH + z, 1);
-    createCube(this, CUBES, +ROD_LENGTH + x, 0 + y, -ROD_LENGTH + z, 1);
-    createCube(this, CUBES, +ROD_LENGTH + x, 0 + y, +ROD_LENGTH + z, 1);
-    createCube(this, CUBES, -ROD_LENGTH + x, -ROD_LENGTH + y, 0 + z, 1);
-    createCube(this, CUBES, +ROD_LENGTH + x, -ROD_LENGTH + y, 0 + z, 1);
-    createCube(this, CUBES, -ROD_LENGTH + x, +ROD_LENGTH + y, 0 + z, 1);
-    createCube(this, CUBES, +ROD_LENGTH + x, +ROD_LENGTH + y, 0 + z, 1);
 
     // set up the sphere vars
     var radius = GRIP_RADIUS,
@@ -244,14 +261,6 @@ function createConstruction (grip1, grip2) {
     mesh.position.x = x;
     mesh.position.y = y;
     mesh.position.z = z;
-
-    mesh.toggleCubes = function (flag) {
-      TOPOINTS = CUBES;
-      CUBES.forEach(function (cube) {
-        flag ? group.add(cube) : group.remove(cube);
-        cube.material.opacity = flag ? 0.2 : 0;
-      });
-    }
 
     group.add(mesh);
     GRIPS.push(mesh);
@@ -332,7 +341,7 @@ function init () {
     window.innerWidth / window.innerHeight,
     1, 10000
   );
-  camera.position.z = 5;
+  camera.position.z = 8;
 
   // Build scene.
   scene = new THREE.Scene();
@@ -341,6 +350,9 @@ function init () {
   construction = createConstruction();
   construction.position.y -= 1;
   scene.add(construction);
+
+  straightGrid = createStraightGridControl();
+  diagonalGrid = createDiagonalGridControl();
 
   // Add point light
   var pointLight = new THREE.PointLight(0xFFFFFF);
@@ -381,6 +393,7 @@ var KEY_D = 68;
 var KEY_R = 82;
 var KEY_F = 70;
 var KEY_SPACE = 32;
+var KEY_SHIFT = 16;
 
 var ACCEL_GRAV = -0.004, accel_y = 0;
 
@@ -433,20 +446,20 @@ function render() {
         POINTED = null;
       }
 
-      if (TOPOINTS) {
-        var intersects = raycaster.intersectObjects( TOPOINTS );
+      if (tmpgridcontrol) {
+        var intersects = raycaster.intersectObjects( tmpgridcontrol.children );
         if (intersects.length) {
           if (POINTEDCUBE != intersects[0].object) {
             if (POINTEDCUBE) {
-              POINTEDCUBE.material.opacity = 0.2;
+              POINTEDCUBE.material.opacity = 0.1;
             }
 
             POINTEDCUBE = intersects[ 0 ].object;
-            POINTEDCUBE.material.opacity = 0.5;
+            POINTEDCUBE.material.opacity = 0.4;
           }
         } else {
           if (POINTEDCUBE) {
-            POINTEDCUBE.material.opacity = 0.2;
+            POINTEDCUBE.material.opacity = 0.1;
           }
           POINTEDCUBE = null;
         }
@@ -461,7 +474,7 @@ function render() {
 var isMouseDown = false;
 
 
-var tmprod, tmpgrip, tmppointed;
+var tmprod, tmpgrip, tmppointed, tmpgridcontrol;
 $(document).on('mousemove', function ( event ) {
   mouse.x = ( event.clientX / window.innerWidth ) * 2 - 1;
   mouse.y = - ( event.clientY / window.innerHeight ) * 2 + 1;
@@ -473,7 +486,10 @@ $(document).on('mousemove', function ( event ) {
   }
   if (POINTEDCUBE && !tmppointed) {
     tmppointed = POINTEDCUBE;
-    tmpgrip = construction.createGrip(POINTEDCUBE.position.x, POINTEDCUBE.position.y, POINTEDCUBE.position.z);
+    tmpgrip = construction.createGrip(
+      SELECTED.position.x + POINTEDCUBE.position.x,
+      SELECTED.position.y + POINTEDCUBE.position.y,
+      SELECTED.position.z + POINTEDCUBE.position.z);
     tmprod = construction.createRod(SELECTED, tmpgrip, tmppointed.type);
     console.log('connect', tmprod);
   } 
@@ -485,11 +501,14 @@ $(document).on('mousemove', function ( event ) {
 $(document).on('mouseup', function () {
   isMouseDown = false;
   if (SELECTED) {
-    SELECTED.toggleCubes(false);
     SELECTED.material.opacity = 0;
     SELECTED = null;
   }
-  tmprod = tmpgrip = null;
+  if (tmpgridcontrol) {
+    console.log('remove');
+    construction.remove(tmpgridcontrol);
+  }
+  tmprod = tmpgrip = tmpgridcontrol = null;
 });
 
 $(document).on('mousedown', function () {
@@ -501,16 +520,32 @@ $(document).on('mousedown', function () {
     }
     SELECTED = POINTED;
     SELECTED.material.opacity = 0.5;
-    SELECTED.toggleCubes(true);
+
+    tmpgridcontrol = keysdown[KEY_SHIFT] ? diagonalGrid : straightGrid;
+    construction.add(tmpgridcontrol);
+    tmpgridcontrol.position.copy(SELECTED.position);
   }
 });
 
 var keysdown = {};
 $(document).on('keydown', function (e) {
   keysdown[e.which] = true;
+  if (e.which == KEY_SHIFT && tmpgridcontrol) {
+    diagonalGrid.position.copy(tmpgridcontrol.position);
+    construction.remove(tmpgridcontrol);
+    construction.add(diagonalGrid);
+    tmpgridcontrol = diagonalGrid;
+    console.log(diagonalGrid.position);
+  }
 });
 $(document).on('keyup', function (e) {
   delete keysdown[e.which];
+  if (e.which == KEY_SHIFT && tmpgridcontrol) {
+    straightGrid.position.copy(tmpgridcontrol.position);
+    construction.remove(tmpgridcontrol);
+    construction.add(straightGrid);
+    tmpgridcontrol = straightGrid;
+  }
 });
 $(document).on('focus', function (e) {
   keysdown = {};
