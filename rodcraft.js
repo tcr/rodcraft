@@ -375,7 +375,7 @@ var ACCEL_GRAV = -0.004, accel_y = 0, PLAYER_HEIGHT = 1;
 
 function render() {
 
-  if (document.webkitPointerLockElement == document.body) {
+  if (document.pointerLockElement == document.body) {
     if (keysdown[KEY_DOWN])   construction.rotation.x += 0.02;
     if (keysdown[KEY_UP])     construction.rotation.x -= 0.02;
     if (keysdown[KEY_LEFT])   construction.rotation.y -= 0.02;
@@ -524,7 +524,7 @@ $(document).on('focus', function (e) {
 });
 
 $(document).on('click', function () {
-  document.body.webkitRequestPointerLock();
+  document.body.requestPointerLock();
 });
 
 // Start.
